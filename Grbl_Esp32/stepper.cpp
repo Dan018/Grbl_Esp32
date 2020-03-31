@@ -590,6 +590,17 @@ void initRMT() {
     rmt_config(&rmtConfig);
     rmt_fill_tx_items(rmtConfig.channel, &rmtItem[0], rmtConfig.mem_block_num, 0);
 #endif
+#ifdef Z2_STEP_PIN
+    Z2_rmt_chan_num = sys_get_next_RMT_chan_num();
+    rmt_set_source_clk((rmt_channel_t)Z2_rmt_chan_num, RMT_BASECLK_APB);
+    rmtConfig.channel = (rmt_channel_t)Z2_rmt_chan_num;
+    rmtConfig.tx_config.idle_level = bit_istrue(settings.step_invert_mask, Z_AXIS) ? RMT_IDLE_LEVEL_HIGH : RMT_IDLE_LEVEL_LOW;
+    rmtConfig.gpio_num = Z2_STEP_PIN;
+    rmtItem[0].level0 = rmtConfig.tx_config.idle_level;
+    rmtItem[0].level1 = !rmtConfig.tx_config.idle_level;
+    rmt_config(&rmtConfig);
+    rmt_fill_tx_items(rmtConfig.channel, &rmtItem[0], rmtConfig.mem_block_num, 0);
+#endif
 #ifdef A_STEP_PIN
     A_rmt_chan_num = sys_get_next_RMT_chan_num();
     rmt_set_source_clk((rmt_channel_t)A_rmt_chan_num, RMT_BASECLK_APB);
@@ -668,10 +679,6 @@ void st_reset() {
     // TODO do we need to turn step pins off?
 }
 
-
-
-
-
 void set_direction_pins_on(uint8_t onMask) {
     // inverts are applied in step generation
 #ifdef X_DIRECTION_PIN
@@ -730,37 +737,40 @@ void set_stepper_pins_on(uint8_t onMask) {
 #endif
 }
 #else // we use ganged axes
+
 void set_stepper_pins_on(uint8_t onMask) {
-    onMask ^= settings.step_invert_mask; // invert pins as required by invert mask
+onMask ^= settings.step_invert_mask; // invert pins as required by invert mask
 #ifdef X_STEP_PIN
-#ifndef X2_STEP_PIN // if not a ganged axis
-    digitalWrite(X_STEP_PIN, (onMask & (1 << X_AXIS)));
-#else // is a ganged axis
+    #ifndef X2_STEP_PIN // if not a ganged axis
+        digitalWrite(X_STEP_PIN, (onMask & (1 << X_AXIS)));
+    #else // is a ganged axis
     if ((ganged_mode == SQUARING_MODE_DUAL) || (ganged_mode == SQUARING_MODE_A))
         digitalWrite(X_STEP_PIN, (onMask & (1 << X_AXIS)));
     if ((ganged_mode == SQUARING_MODE_DUAL) || (ganged_mode == SQUARING_MODE_B))
         digitalWrite(X2_STEP_PIN, (onMask & (1 << X_AXIS)));
+    #endif
 #endif
-#endif
+
 #ifdef Y_STEP_PIN
-#ifndef Y2_STEP_PIN // if not a ganged axis
-    digitalWrite(Y_STEP_PIN, (onMask & (1 << Y_AXIS)));
-#else // is a ganged axis
+    #ifndef Y2_STEP_PIN // if not a ganged axis
+        digitalWrite(Y_STEP_PIN, (onMask & (1 << Y_AXIS)));
+    #else // is a ganged axis
     if ((ganged_mode == SQUARING_MODE_DUAL) || (ganged_mode == SQUARING_MODE_A))
         digitalWrite(Y_STEP_PIN, (onMask & (1 << Y_AXIS)));
     if ((ganged_mode == SQUARING_MODE_DUAL) || (ganged_mode == SQUARING_MODE_B))
         digitalWrite(Y2_STEP_PIN, (onMask & (1 << Y_AXIS)));
+    #endif
 #endif
-#endif
+
 #ifdef Z_STEP_PIN
-#ifndef Z2_STEP_PIN // if not a ganged axis
-    digitalWrite(Z_STEP_PIN, (onMask & (1 << Z_AXIS)));
-#else // is a ganged axis
+    #ifndef Z2_STEP_PIN // if not a ganged axis
+        digitalWrite(Z_STEP_PIN, (onMask & (1 << Z_AXIS)));
+    #else // is a ganged axis
     if ((ganged_mode == SQUARING_MODE_DUAL) || (ganged_mode == SQUARING_MODE_A))
         digitalWrite(Z_STEP_PIN, (onMask & (1 << Z_AXIS)));
     if ((ganged_mode == SQUARING_MODE_DUAL) || (ganged_mode == SQUARING_MODE_B))
         digitalWrite(Z2_STEP_PIN, (onMask & (1 << Z_AXIS)));
-#endif
+    #endif
 #endif
 }
 #endif
@@ -770,10 +780,10 @@ void set_stepper_pins_on(uint8_t onMask) {
 inline IRAM_ATTR static void stepperRMT_Outputs() {
 #ifdef  X_STEP_PIN
     if (st.step_outbits & (1 << X_AXIS)) {
-#ifndef X2_STEP_PIN // if not a ganged axis
-        RMT.conf_ch[X_rmt_chan_num].conf1.mem_rd_rst = 1;
-        RMT.conf_ch[X_rmt_chan_num].conf1.tx_start = 1;
-#else // it is a ganged axis
+        #ifndef X2_STEP_PIN // if not a ganged axis
+            RMT.conf_ch[X_rmt_chan_num].conf1.mem_rd_rst = 1;
+            RMT.conf_ch[X_rmt_chan_num].conf1.tx_start = 1;
+        #else // it is a ganged axis
         if ((ganged_mode == SQUARING_MODE_DUAL) || (ganged_mode == SQUARING_MODE_A)) {
             RMT.conf_ch[X_rmt_chan_num].conf1.mem_rd_rst = 1;
             RMT.conf_ch[X_rmt_chan_num].conf1.tx_start = 1;
@@ -782,15 +792,16 @@ inline IRAM_ATTR static void stepperRMT_Outputs() {
             RMT.conf_ch[X2_rmt_chan_num].conf1.mem_rd_rst = 1;
             RMT.conf_ch[X2_rmt_chan_num].conf1.tx_start = 1;
         }
-#endif
+        #endif
     }
 #endif
+
 #ifdef  Y_STEP_PIN
     if (st.step_outbits & (1 << Y_AXIS)) {
-#ifndef Y2_STEP_PIN // if not a ganged axis
-        RMT.conf_ch[Y_rmt_chan_num].conf1.mem_rd_rst = 1;
-        RMT.conf_ch[Y_rmt_chan_num].conf1.tx_start = 1;
-#else // it is a ganged axis
+        #ifndef Y2_STEP_PIN // if not a ganged axis
+            RMT.conf_ch[Y_rmt_chan_num].conf1.mem_rd_rst = 1;
+            RMT.conf_ch[Y_rmt_chan_num].conf1.tx_start = 1;
+        #else // it is a ganged axis
         if ((ganged_mode == SQUARING_MODE_DUAL) || (ganged_mode == SQUARING_MODE_A)) {
             RMT.conf_ch[Y_rmt_chan_num].conf1.mem_rd_rst = 1;
             RMT.conf_ch[Y_rmt_chan_num].conf1.tx_start = 1;
@@ -799,15 +810,28 @@ inline IRAM_ATTR static void stepperRMT_Outputs() {
             RMT.conf_ch[Y2_rmt_chan_num].conf1.mem_rd_rst = 1;
             RMT.conf_ch[Y2_rmt_chan_num].conf1.tx_start = 1;
         }
-#endif
+        #endif
     }
 #endif
+
 #ifdef  Z_STEP_PIN
     if (st.step_outbits & (1 << Z_AXIS)) {
-        RMT.conf_ch[Z_rmt_chan_num].conf1.mem_rd_rst = 1;
-        RMT.conf_ch[Z_rmt_chan_num].conf1.tx_start = 1;
+        #ifndef Z2_STEP_PIN // if not a ganged axis
+            RMT.conf_ch[Z_rmt_chan_num].conf1.mem_rd_rst = 1;
+            RMT.conf_ch[Z_rmt_chan_num].conf1.tx_start = 1;
+        #else // it is a ganged axis
+        if ((ganged_mode == SQUARING_MODE_DUAL) || (ganged_mode == SQUARING_MODE_A)) {
+            RMT.conf_ch[Z_rmt_chan_num].conf1.mem_rd_rst = 1;
+            RMT.conf_ch[Z_rmt_chan_num].conf1.tx_start = 1;
+        }
+        if ((ganged_mode == SQUARING_MODE_DUAL) || (ganged_mode == SQUARING_MODE_B)) {
+            RMT.conf_ch[Z2_rmt_chan_num].conf1.mem_rd_rst = 1;
+            RMT.conf_ch[Z2_rmt_chan_num].conf1.tx_start = 1;
+        }
+        #endif
     }
 #endif
+
 #ifdef  A_STEP_PIN
     if (st.step_outbits & (1 << A_AXIS)) {
         RMT.conf_ch[A_rmt_chan_num].conf1.mem_rd_rst = 1;
